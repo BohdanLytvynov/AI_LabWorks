@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+/.vs
+Lab1/.vs
+ConsoleColors/x64/Debug
+ConsoleColors/x64/Release
+ConsoleUI/x64/Debug
+ConsoleUI/x64/Release
+Lab1/Lab1/x64/Debug
+Lab1/Lab1/x64/Release
+Lab1/x64/Debug
+Lab1/x64/Release
