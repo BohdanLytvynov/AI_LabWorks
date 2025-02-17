@@ -52,7 +52,7 @@ auto Str_To_Bool = [](LPTSTR result, LPCTSTR error, int& error_code)->bool
             if ((int)no[i] == (int)(*result))
             {
                 error_code = 0;                
-                return true;
+                return false;
             }
         }
 
@@ -127,6 +127,8 @@ auto int_positive_Validator_0 = [](int result, LPCTSTR error) -> bool
 
 LPCTSTR smooth_msg = TEXT("Please choose smoothing algorithm:\n\tPress 1 - Summation without Scaling.\n\tPress 2 - Summation with scaling.\n\tPress 3 - image convolution with a Gaussian kernel\n\tPress 4 - Finding the average value in the neighborhood\n\t Press 5 - Double Filtration");
 
+const char* originNameWindow = "Original";
+
 int main()
 {
     int flag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
@@ -157,13 +159,15 @@ int main()
 
         getline(std::cin, path);
        
-        srcImg = cvLoadImage(path.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+        srcImg = cvLoadImage(path.c_str(), CV_LOAD_IMAGE_UNCHANGED);
                 
         if (srcImg)
         {
-            cvNamedWindow("Original", CV_WINDOW_AUTOSIZE);
+            cvNamedWindow(originNameWindow, CV_WINDOW_AUTOSIZE);
 
-            cvShowImage("Original", srcImg);
+            cvShowImage(originNameWindow, srcImg);
+
+            cv::waitKey(0);
 
             img_opened = true;
         }
@@ -240,12 +244,16 @@ int main()
                     int sigma2 = consoleIOPtr->Input<int>(TEXT("Enter the value of sigma2 parameter."), Str_to_double);
 
                     cvSmooth(srcImg, destImg, smoothType, size1, size2, sigma1, sigma2);
-
+                   
                     cvNamedWindow(windowName, CV_WINDOW_AUTOSIZE);
 
                     cvShowImage(windowName, destImg);
 
+                    cv::waitKey(0);
+
                     tryMoreSmooth = consoleIOPtr->Input<bool>(TEXT("Would you like to try another smooth method? Y | N"), Str_To_Bool);
+
+                    cvDestroyWindow(windowName);
 
                 } while (tryMoreSmooth);
             }
@@ -295,6 +303,8 @@ int main()
 
                     cvShowImage(buff, resizedImg);
 
+                    cv::waitKey(0);
+
                     strStream.clear();
 
                     std::memset(buff, 0, sizeof(buff));
@@ -339,6 +349,8 @@ int main()
                         cvAddS(last, cvScalar(scalar), last);
 
                         cvShowImage(buff, last);
+
+                        cv::waitKey(0);
 
                         more_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to select another ROI? Y | N"), Str_To_Bool);
 
