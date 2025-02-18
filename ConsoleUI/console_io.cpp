@@ -28,7 +28,7 @@ io::ConsoleInputOutput::ConsoleInputOutput(HANDLE console, WORD defForegroundCol
 {
 }
 
-io::ConsoleInputOutput::ConsoleInputOutput(HANDLE console, WORD defErrorForegroundColor, WORD defErrorBackgroundColor ...)
+io::ConsoleInputOutput::ConsoleInputOutput(HANDLE console, WORD defErrorForegroundColor, WORD defErrorBackgroundColor, ...)
     : ConsoleInputOutput(console, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
         0, defErrorForegroundColor, defErrorBackgroundColor)
 {
@@ -81,86 +81,64 @@ void io::ConsoleInputOutput::ReadLine(char* value, size_t length)
     std::cin.getline(value, length);
 }
 
-void io::ConsoleInputOutput::Input(LPCTSTR msg, LPTSTR buff, std::function<bool(LPTSTR result, LPCTSTR error)> validator)
+void io::ConsoleInputOutput::Input(LPCTSTR msg, LPTSTR& buff, std::function<bool(LPCTSTR result, LPTSTR& error)> validator)
 {
-    LPTSTR temp = nullptr;
+    TCHAR temp[1024];
     LPTSTR error = nullptr;
-    size_t count = 1024;
+ 
     do
     {
         if (msg)
         {
             PrintLine(msg);
         }
-        
-        temp = new TCHAR[count];
-        error = new TCHAR[count];
-        
-        ReadLine(temp, count);
+                       
+        ReadLine(temp, sizeof(temp));
 
         if (validator && !validator(temp, error))
         {
             PrintLine(TEXT("Error during validation!"), m_def_errorForeground, m_def_errorBackground);
             PrintLine(error);
-            delete[] temp;
-            delete[] error;
+            std::memset(temp, 0, sizeof(temp));
+            error = nullptr;
             continue;
         }
 
         break;
 
     } while (true);
-    
-    for (size_t i = 0; i < count; ++i)
-    {
-        buff[i] = temp[i];
-    }
 
-    delete[] temp;
-    delete[] error;
+    buff = temp;     
 }
 
-void io::ConsoleInputOutput::Input(const char* msg, char*& buff, std::function<bool(char* result, const char* error)> validator)
+void io::ConsoleInputOutput::Input(const char* msg, char*& buff, std::function<bool(const char* result, char*& error)> validator)
 {
-    char* temp = nullptr;
+    char temp[1024];
     char* error = nullptr;
-    size_t count = 1024;
+
     do
     {
         if (msg)
         {
             PrintLine(msg);
         }
-
-        temp = new char[count];
-        error = new char[count];
-
-        ReadLine(temp, count);
+        
+        ReadLine(temp, sizeof(temp));
 
         if (validator && !validator(temp, error))
         {
             PrintLine("Error during validation!", m_def_errorForeground, m_def_errorBackground);
             PrintLine(error);
-            delete[] temp;
-            delete[] error;
+            std::memset(temp, 0, sizeof(temp));
+            error = nullptr;
             continue;
         }
 
         break;
 
-    } while (true);
+    } while (true); 
 
-    int act_count = std::strlen(temp);
-
-    buff = new char[act_count];
-
-    for (size_t i = 0; i < act_count; ++i)
-    {
-        buff[i] = temp[i];
-    }
-
-    delete[] temp;
-    delete[] error;
+    buff = temp;
 }
 
 

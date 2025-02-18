@@ -17,6 +17,9 @@
 
 namespace graphics
 {
+    /// <summary>
+    /// Class that is used to use console graphics functions
+    /// </summary>
     struct CONSOLE_GRAPHICS_API ConsoleGraphics
     {
         ConsoleGraphics(HANDLE consoleHandler);
@@ -24,7 +27,7 @@ namespace graphics
         void Draw();
 
     private:
-        HANDLE _consoleHandler;
+        HANDLE _consoleHandler;//Pointer to the console
     };
 }
 

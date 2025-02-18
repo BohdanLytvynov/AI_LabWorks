@@ -1,9 +1,13 @@
 
-#ifndef CONSOLE_COLORS_H
+#ifndef CONSOLE_COLORS_H//Header guard
 
 #define CONSOLE_COLORS_H
 #include<windows.h>
 #pragma region Colors
+
+/// <summary>
+/// Class that is used for colors
+/// </summary>
 class Colors
 {
 public:

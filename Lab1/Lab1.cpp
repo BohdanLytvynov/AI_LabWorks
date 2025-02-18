@@ -7,8 +7,22 @@
 #include"../ConsoleColors/console_colors.h"
 #include<vector>
 #include<sstream>
-#include<string>
 
+void Format(char*& output, size_t length, size_t paramsCount, ...)
+{
+    size_t* pCount = &paramsCount;//Get the address of the variable of the paramsCount variable on the stack
+    
+    std::stringstream StrStream;
+
+    for (size_t i = 1; i <= paramsCount; i++)
+    {
+        StrStream << *(pCount + i);
+    }
+
+    StrStream.getline(output, sizeof(length));
+
+    StrStream.clear();
+}
 
 LPCTSTR GetCurrentFile()
 {
@@ -34,7 +48,7 @@ void getPathToCurrentFolder(int size_of_input, int count_to_ignore, LPTSTR resul
 LPCTSTR yes = TEXT("YyÍí");
 LPCTSTR no = TEXT("NnÒò");
 
-auto Str_To_Bool = [](LPTSTR result, LPCTSTR error, int& error_code)->bool
+auto Str_To_Bool = [](LPCTSTR result, LPCTSTR& error, int& error_code)->bool
     {
         size_t length = _tcslen(yes);
         
@@ -61,7 +75,7 @@ auto Str_To_Bool = [](LPTSTR result, LPCTSTR error, int& error_code)->bool
         return false;
     };
 
-auto Str_to_int = [](LPTSTR result, LPCTSTR error, int& error_code) -> int
+auto Str_to_int = [](LPCTSTR result, LPCTSTR& error, int& error_code) -> int
     {
         int temp = INT32_MIN;
         error_code = 0;
@@ -81,7 +95,7 @@ auto Str_to_int = [](LPTSTR result, LPCTSTR error, int& error_code) -> int
         return temp;
     };
 
-auto positive_double_validator = [](double result, LPCTSTR error)->bool
+auto positive_double_validator = [](double result, LPCTSTR& error)->bool
     {
         if (result <= 0)
         {
@@ -92,7 +106,7 @@ auto positive_double_validator = [](double result, LPCTSTR error)->bool
         return true;
     };
 
-auto Str_to_double = [](LPTSTR result, LPCTSTR error, int& error_code) -> double
+auto Str_to_double = [](LPCTSTR result, LPCTSTR& error, int& error_code) -> double
     {
         double temp = DBL_MIN;
         error_code = 0;
@@ -114,7 +128,7 @@ auto Str_to_double = [](LPTSTR result, LPCTSTR error, int& error_code) -> double
         return temp;
     };
 
-auto int_positive_Validator_0 = [](int result, LPCTSTR error) -> bool
+auto int_positive_Validator_0 = [](int result, LPCTSTR& error) -> bool
     {
         if (result < 0)
         {
@@ -152,14 +166,11 @@ int main()
     IplImage* srcImg;
 
     for (; ;)
-    {    
-        std::string path;
-
-        consoleIOPtr->PrintLine(TEXT("Enter path to file:"));
-
-        getline(std::cin, path);
+    {           
+        char* path = nullptr;
+        consoleIOPtr->Input("Enter path to file:", path);
        
-        srcImg = cvLoadImage(path.c_str(), CV_LOAD_IMAGE_UNCHANGED);
+        srcImg = cvLoadImage(path, CV_LOAD_IMAGE_UNCHANGED);
                 
         if (srcImg)
         {
