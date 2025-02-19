@@ -7,23 +7,12 @@
 #include"../ConsoleColors/console_colors.h"
 #include<vector>
 #include<sstream>
+#include"Processed_Image.h"
 
-void Format(char*& output, size_t length, size_t paramsCount, ...)
-{
-    size_t* pCount = &paramsCount;//Get the address of the variable of the paramsCount variable on the stack
-    
-    std::stringstream StrStream;
-
-    for (size_t i = 1; i <= paramsCount; i++)
-    {
-        StrStream << *(pCount + i);
-    }
-
-    StrStream.getline(output, sizeof(length));
-
-    StrStream.clear();
-}
-
+/// <summary>
+/// Currently not used but maybe we will use it in future
+/// </summary>
+/// <returns></returns>
 LPCTSTR GetCurrentFile()
 {
 #ifdef _UNICODE
@@ -34,7 +23,12 @@ LPCTSTR GetCurrentFile()
 }
 
 const int count_to_ignore = 8;
-
+/// <summary>
+/// Currently not used
+/// </summary>
+/// <param name="size_of_input"></param>
+/// <param name="count_to_ignore"></param>
+/// <param name="result"></param>
 void getPathToCurrentFolder(int size_of_input, int count_to_ignore, LPTSTR result)
 {
     LPCTSTR input = GetCurrentFile();
@@ -44,10 +38,19 @@ void getPathToCurrentFolder(int size_of_input, int count_to_ignore, LPTSTR resul
         result[i] = input[i];
     }
 }
-
+/// <summary>
+/// Array of THAR that stores different variations of YES 
+/// </summary>
 LPCTSTR yes = TEXT("YyÕÌ");
+
+/// <summary>
+/// Array of THAR that stores different variations of NO 
+/// </summary>
 LPCTSTR no = TEXT("Nn“Ú");
 
+/// <summary>
+/// TCHAR string to bool converter function
+/// </summary>
 auto Str_To_Bool = [](LPCTSTR result, LPCTSTR& error, int& error_code)->bool
     {
         size_t length = _tcslen(yes);
@@ -75,6 +78,9 @@ auto Str_To_Bool = [](LPCTSTR result, LPCTSTR& error, int& error_code)->bool
         return false;
     };
 
+/// <summary>
+/// TCHAR string to int converter function
+/// </summary>
 auto Str_to_int = [](LPCTSTR result, LPCTSTR& error, int& error_code) -> int
     {
         int temp = INT32_MIN;
@@ -95,6 +101,9 @@ auto Str_to_int = [](LPCTSTR result, LPCTSTR& error, int& error_code) -> int
         return temp;
     };
 
+/// <summary>
+/// Function that checks if double value is positive and not zero
+/// </summary>
 auto positive_double_validator = [](double result, LPCTSTR& error)->bool
     {
         if (result <= 0)
@@ -105,7 +114,9 @@ auto positive_double_validator = [](double result, LPCTSTR& error)->bool
 
         return true;
     };
-
+/// <summary>
+/// TCHAR string to double converter
+/// </summary>
 auto Str_to_double = [](LPCTSTR result, LPCTSTR& error, int& error_code) -> double
     {
         double temp = DBL_MIN;
@@ -128,6 +139,9 @@ auto Str_to_double = [](LPCTSTR result, LPCTSTR& error, int& error_code) -> doub
         return temp;
     };
 
+/// <summary>
+/// Checks if the integer value is positive or 0
+/// </summary>
 auto int_positive_Validator_0 = [](int result, LPCTSTR& error) -> bool
     {
         if (result < 0)
@@ -143,8 +157,37 @@ LPCTSTR smooth_msg = TEXT("Please choose smoothing algorithm:\n\tPress 1 - Summa
 
 const char* originNameWindow = "Original";
 
+void DestrImage(IplImage* img)
+{
+    cvReleaseImage(&img);
+}
+
+typedef Processed_Image<IplImage*> img;
+
+//Temp storage for Images
+std::vector<img> m_images;
+//Temp storage for Window names
+std::vector<const char*> m_windowNames;
+//Last image that was processed in the current block
+img m_lastImage;
+
+void FinishProcessing()
+{
+    m_lastImage = m_images[m_images.size() - 1];
+
+    m_images.clear();//Need to find out wether destr will be called?
+
+    for (auto& window : m_windowNames)
+    {
+        cvDestroyWindow(window);
+    }
+
+    m_windowNames.clear();
+}
+
 int main()
 {
+    //Mem leak check flags setup
     int flag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
     flag |= _CRTDBG_LEAK_CHECK_DF;
     _CrtSetDbgFlag(flag);  
@@ -153,59 +196,67 @@ int main()
 
     printf("Program starting...\n");
 
-    HANDLE handler = GetStdHandle(STD_OUTPUT_HANDLE);
-
+    HANDLE handler = GetStdHandle(STD_OUTPUT_HANDLE);//Get the pointer to the console
+    //Init ConsoleInputOutput module that is required for IO operations
+    //We used smart pointer and it will help us to manage heap
     std::shared_ptr<io::ConsoleInputOutput> consoleIOPtr = std::make_shared<io::ConsoleInputOutput>(handler);    
             
     //Main Programm Cycle
-
+    //Controls if image was opened succesfully or not
     bool img_opened = false;
 
-    std::vector<IplImage*> Images;
-
-    IplImage* srcImg;
-
+    IplImage* srcImg;//Pointer to the image
+    
+    //Main app cycle
     for (; ;)
     {           
+        //Get the path to the file that is the image for processing
         char* path = nullptr;
         consoleIOPtr->Input("Enter path to file:", path);
-       
+        //Loading the image
         srcImg = cvLoadImage(path, CV_LOAD_IMAGE_UNCHANGED);
                 
-        if (srcImg)
+        if (srcImg)//Image successfuly loaded -> we can start the processing chain 
         {
+            //Create the window to place the image there
             cvNamedWindow(originNameWindow, CV_WINDOW_AUTOSIZE);
-
+            //Display the image
             cvShowImage(originNameWindow, srcImg);
-
+            //Stop current thread to give some time for img loading and display
             cv::waitKey(0);
 
             img_opened = true;
         }
-        else
+        else//Case when the image wasn't loaded
         {
-            consoleIOPtr->PrintLine("Unable to open file!", Colors::RED, Colors::BLACKBack);
+            consoleIOPtr->PrintLine("Unable to open file!");
             img_opened = false;
         }     
 
-        if (img_opened)
+        if (img_opened)//Start the processing chain
         {
+            //Do we need smoothing?
             bool need_smooth = consoleIOPtr->Input<bool>(TEXT("Would you like to smooth your image? Y | N"), Str_To_Bool);
-
+            //Controls the current loop for smoothing
             bool tryMoreSmooth = false;
 
-            if (need_smooth)
-            {
+            if (need_smooth)//We need to smooth the image
+            {        
+                int index = 0;
+
                 do
                 {
+                    //Clone the image for smooth, so we can compare it with the original one
                     IplImage* destImg = cvCloneImage(srcImg);
+                    //Save new image to the Image storage so we will use the last processed image for later steps
+                    img img("Smoothing", destImg, DestrImage);
 
-                    Images.push_back(destImg);
+                    m_images.push_back(img);
 
                     const char* windowName = "";
 
                     int smoothType = 0;
-
+                    //Get the smoothing type
                     int comand_numb = consoleIOPtr->Input<int>(smooth_msg, Str_to_int, [](int result, LPCTSTR error) -> bool
                         {
                             if (result <= 0 && result > 5)
@@ -245,7 +296,17 @@ int main()
                         windowName = "Double Filtration";
                         break;                    
                     }
+                    //Build new Window name with index
+                    size_t count = std::strlen(windowName) + 10;
+                    char* IndexedWindow = new char[count];
 
+                    std::stringstream Str;
+
+                    Str << windowName << " " << index;
+
+                    Str.getline(IndexedWindow, count);
+
+                    //Get the values that are required for smooth function
                     int size1 = consoleIOPtr->Input<int>(TEXT("Enter the value of size1 parameter."), Str_to_int);
 
                     int size2 = consoleIOPtr->Input<int>(TEXT("Enter the value of size2 parameter."), Str_to_int);
@@ -253,28 +314,37 @@ int main()
                     int sigma1 = consoleIOPtr->Input<int>(TEXT("Enter the value of sigma1 parameter."), Str_to_double);
 
                     int sigma2 = consoleIOPtr->Input<int>(TEXT("Enter the value of sigma2 parameter."), Str_to_double);
-
+                    //Perform smoothing
                     cvSmooth(srcImg, destImg, smoothType, size1, size2, sigma1, sigma2);
-                   
-                    cvNamedWindow(windowName, CV_WINDOW_AUTOSIZE);
+                    //Create new window to show the result of smooth
+                    cvNamedWindow(IndexedWindow, CV_WINDOW_AUTOSIZE);
+                    //Show the smoothed image
+                    cvShowImage(IndexedWindow, destImg);
 
-                    cvShowImage(windowName, destImg);
+                    //Add the window name to temp storage for this process block
+                    m_windowNames.push_back(IndexedWindow);
 
+                    Str.clear();//Clear StringStream
+
+                    delete[] IndexedWindow;//Clear window name
+                    IndexedWindow = nullptr;
+
+                    //Current thread must wait until the smoothed image will be displayed
                     cv::waitKey(0);
+                    //Do we need another iteration of smoothing?
+                    tryMoreSmooth = consoleIOPtr->Input<bool>(TEXT("Would you like to try another smooth method? Y | N"), Str_To_Bool);                    
 
-                    tryMoreSmooth = consoleIOPtr->Input<bool>(TEXT("Would you like to try another smooth method? Y | N"), Str_To_Bool);
-
-                    cvDestroyWindow(windowName);
+                    ++index;
 
                 } while (tryMoreSmooth);
+
+                FinishProcessing();
             }
 
             bool need_resize = consoleIOPtr->Input<bool>(TEXT("Would you like to resize your image? Y | N"), Str_To_Bool);
-
+           
             if (need_resize)
-            {
-                IplImage* last;
-
+            {                
                 bool more_resize = false;
                 
                 do
@@ -294,25 +364,29 @@ int main()
 
                             return true;
                         });
-
-                    last = Images[Images.size() - 1];
-
+                    
                     std::stringstream strStream;
 
                     strStream << "Resize" << "[" << w_multipl << "," << h_multipl << "]";
 
-                    char buff[20];
+                    char buff[30];
                     strStream.getline(buff, sizeof(buff));
 
                     cvNamedWindow(buff, CV_WINDOW_AUTOSIZE);
                    
-                    IplImage* resizedImg = cvCreateImage(cvSize(last->width/w_multipl, last->height/h_multipl), last->depth, last->nChannels);
+                    IplImage* resizedImg = cvCreateImage(cvSize(m_lastImage.getImage()->width / w_multipl, 
+                        m_lastImage.getImage()->height / h_multipl), 
+                        m_lastImage.getImage()->depth, m_lastImage.getImage()->nChannels);
 
-                    cvResize(last, resizedImg, interpolation);
+                    cvResize(m_lastImage.getImage(), resizedImg, interpolation);
 
-                    Images.push_back(resizedImg);
+                    img img("Resize", resizedImg, DestrImage);
+
+                    m_images.push_back(img);
 
                     cvShowImage(buff, resizedImg);
+
+                    m_windowNames.push_back(buff);
 
                     cv::waitKey(0);
 
@@ -324,7 +398,8 @@ int main()
 
                 } while (more_resize);
 
-                
+                FinishProcessing();
+
                 bool need_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to use ROI? Y | N"), Str_To_Bool);
                 
                 bool more_roi = false;
@@ -343,13 +418,13 @@ int main()
 
                         int scalar = consoleIOPtr->Input<int>(TEXT("Enter scalar for ROI:"), Str_to_int, int_positive_Validator_0);
                         
-                        IplImage* last = Images[Images.size() - 1];
+                        IplImage* last = m_lastImage.getImage();
 
                         std::stringstream strStr;
 
                         strStr << "ROI" << "pos:[" << x << "," << y << "]" << "size: [" << width << "," << height << "]";
 
-                        char buff[20];
+                        char buff[30];
 
                         strStr.getline(buff, sizeof(buff));
 
@@ -361,6 +436,8 @@ int main()
 
                         cvShowImage(buff, last);
 
+                        m_windowNames.push_back(buff);
+
                         cv::waitKey(0);
 
                         more_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to select another ROI? Y | N"), Str_To_Bool);
@@ -370,16 +447,11 @@ int main()
                         std::memset(buff, 0, sizeof(buff));
 
                     } while (more_roi);
+
+                    FinishProcessing();
                 }
             }
-
-            size_t len = Images.size();
-
-            for (size_t i = 0; i < len; i++)
-            {
-                cvReleaseImage(&Images[i]);
-            }
-
+           
             cvReleaseImage(&srcImg);
         }   
 
