@@ -7,7 +7,9 @@
 #include"../ConsoleColors/console_colors.h"
 #include<vector>
 #include<sstream>
+#include<stack>
 #include"Processed_Image.h"
+
 
 /// <summary>
 /// Currently not used but maybe we will use it in future
@@ -162,20 +164,31 @@ void DestrImage(IplImage* img)
     cvReleaseImage(&img);
 }
 
+IplImage* Copy(IplImage* source)
+{
+    return cvCloneImage(source);
+}
+
 typedef Processed_Image<IplImage*> img;
 
 //Temp storage for Images
-std::vector<img> m_images;
+std::stack<img> m_images;
 //Temp storage for Window names
 std::vector<const char*> m_windowNames;
 //Last image that was processed in the current block
 img m_lastImage;
 
+void ClearStack(std::stack<img>* stack)
+{
+    while (!stack->empty())
+        stack->pop();
+}
+
 void FinishProcessing()
 {
-    m_lastImage = m_images[m_images.size() - 1];
+    m_lastImage = img(m_images.top());
 
-    m_images.clear();//Need to find out wether destr will be called?
+    ClearStack(&m_images);
 
     for (auto& window : m_windowNames)
     {
@@ -206,13 +219,22 @@ int main()
     bool img_opened = false;
 
     IplImage* srcImg;//Pointer to the image
-    
+
+    CvRect m_roi;
+
+    bool m_ROI_Used = false;
+
     //Main app cycle
     for (; ;)
-    {           
+    {
         //Get the path to the file that is the image for processing
         char* path = nullptr;
+#if define(NDEBUG)//Release configuration
         consoleIOPtr->Input("Enter path to file:", path);
+#else
+        path = const_cast<char*>("E:\\AI\\CV\\C++\\AI_LabWorks\\Lab1\\Images\\plane.jpg");
+#endif
+        
         //Loading the image
         srcImg = cvLoadImage(path, CV_LOAD_IMAGE_UNCHANGED);
                 
@@ -224,8 +246,11 @@ int main()
             cvShowImage(originNameWindow, srcImg);
             //Stop current thread to give some time for img loading and display
             cv::waitKey(0);
+            img img("Original", srcImg, DestrImage, Copy);
+            m_images.push(img);
 
             img_opened = true;
+            FinishProcessing();
         }
         else//Case when the image wasn't loaded
         {
@@ -246,12 +271,12 @@ int main()
 
                 do
                 {
-                    //Clone the image for smooth, so we can compare it with the original one
-                    IplImage* destImg = cvCloneImage(srcImg);
+                    //Clone the image for smooth, so we can compare it with the original one                 
+                    IplImage* destImg = cvCloneImage(m_lastImage.getImage());
                     //Save new image to the Image storage so we will use the last processed image for later steps
-                    img img("Smoothing", destImg, DestrImage);
+                    img img("Smoothing", destImg, DestrImage, Copy);
 
-                    m_images.push_back(img);
+                    m_images.push(img);
 
                     const char* windowName = "";
 
@@ -380,9 +405,9 @@ int main()
 
                     cvResize(m_lastImage.getImage(), resizedImg, interpolation);
 
-                    img img("Resize", resizedImg, DestrImage);
+                    img img("Resize", resizedImg, DestrImage, Copy);
 
-                    m_images.push_back(img);
+                    m_images.push(img);
 
                     cvShowImage(buff, resizedImg);
 
@@ -398,60 +423,68 @@ int main()
 
                 } while (more_resize);
 
-                FinishProcessing();
-
-                bool need_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to use ROI? Y | N"), Str_To_Bool);
-                
-                bool more_roi = false;
-
-                if (need_roi)
-                {
-                    do
-                    {
-                        int x = consoleIOPtr->Input<int>(TEXT("Enter the x position for ROI:"), Str_to_int, int_positive_Validator_0);
-
-                        int y = consoleIOPtr->Input<int>(TEXT("Enter the y position for ROI:"), Str_to_int, int_positive_Validator_0);
-
-                        int width = consoleIOPtr->Input<int>(TEXT("Enter width for ROI:"), Str_to_int, int_positive_Validator_0);
-
-                        int height = consoleIOPtr->Input<int>(TEXT("Enter height for ROI:"), Str_to_int, int_positive_Validator_0);
-
-                        int scalar = consoleIOPtr->Input<int>(TEXT("Enter scalar for ROI:"), Str_to_int, int_positive_Validator_0);
-                        
-                        IplImage* last = m_lastImage.getImage();
-
-                        std::stringstream strStr;
-
-                        strStr << "ROI" << "pos:[" << x << "," << y << "]" << "size: [" << width << "," << height << "]";
-
-                        char buff[30];
-
-                        strStr.getline(buff, sizeof(buff));
-
-                        cvNamedWindow(buff, CV_WINDOW_AUTOSIZE);
-
-                        cvSetImageROI(last, cvRect(x, y, width, height));
-
-                        cvAddS(last, cvScalar(scalar), last);
-
-                        cvShowImage(buff, last);
-
-                        m_windowNames.push_back(buff);
-
-                        cv::waitKey(0);
-
-                        more_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to select another ROI? Y | N"), Str_To_Bool);
-
-                        cvResetImageROI(last);
-
-                        std::memset(buff, 0, sizeof(buff));
-
-                    } while (more_roi);
-
-                    FinishProcessing();
-                }
+                FinishProcessing();                
             }
            
+            bool need_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to use ROI? Y | N"), Str_To_Bool);
+
+            m_ROI_Used = need_roi;
+
+            bool more_roi = false;
+
+            if (need_roi)
+            {
+                do
+                {
+                    int x = consoleIOPtr->Input<int>(TEXT("Enter the x position for ROI:"), Str_to_int, int_positive_Validator_0);
+
+                    int y = consoleIOPtr->Input<int>(TEXT("Enter the y position for ROI:"), Str_to_int, int_positive_Validator_0);
+
+                    int width = consoleIOPtr->Input<int>(TEXT("Enter width for ROI:"), Str_to_int, int_positive_Validator_0);
+
+                    int height = consoleIOPtr->Input<int>(TEXT("Enter height for ROI:"), Str_to_int, int_positive_Validator_0);
+
+                    int scalar = consoleIOPtr->Input<int>(TEXT("Enter scalar for ROI:"), Str_to_int, int_positive_Validator_0);
+
+                    IplImage* img = cvCloneImage(m_lastImage.getImage());
+
+                    std::stringstream strStr;
+
+                    strStr << "ROI" << "pos:[" << x << "," << y << "]" << "size: [" << width << "," << height << "]";
+
+                    char buff[30];
+
+                    strStr.getline(buff, sizeof(buff));
+
+                    cvNamedWindow(buff, CV_WINDOW_AUTOSIZE);
+
+                    m_roi = cvRect(x, y, width, height);
+
+                    cvSetImageROI(img, m_roi);
+
+                    cvAddS(img, cvScalar(scalar), img);
+                    
+                    cvResetImageROI(img);
+
+                    cvShowImage(buff, img);
+
+                    m_windowNames.push_back(buff);
+
+                    cv::waitKey(0);
+
+                    more_roi = consoleIOPtr->Input<bool>(TEXT("Would you like to select another ROI? Y | N"), Str_To_Bool);
+                    
+                    cvReleaseImage(&img);
+
+                    cvDestroyWindow(buff);
+
+                    std::memset(buff, 0, sizeof(buff));
+
+                } while (more_roi);
+
+                FinishProcessing();
+            }
+
             cvReleaseImage(&srcImg);
         }   
 
